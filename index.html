@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SGC - Gerador de Scripts (local)</title>
+<title>SGC — Gerador de Scripts</title>
 <style>
 :root {
   --azul: #2563eb;
@@ -74,20 +74,26 @@ details summary { cursor: pointer; font-weight: 600; color: var(--azul); }
 <body>
   <header>
     <h1>🧩 SGC — Script Generator Console</h1>
-    <p class="subtitle">Versão local: roda direto no navegador, sem servidor.</p>
+    <p class="subtitle">Descreva o que você precisa. A gente interpreta e gera o script completo.</p>
   </header>
 
   <main>
     <section class="cartao">
       <details id="config-detalhes">
-        <summary>Configuração da API (clique para abrir)</summary>
+        <summary>🔑 Sua chave de API (clique para configurar)</summary>
         <div style="margin-top:1rem;">
+          <p class="dica">Cada pessoa usa a própria chave — ela fica salva só neste navegador (nunca é enviada para nenhum lugar além da API da Anthropic, e nunca passa por nenhum servidor intermediário).</p>
           <label for="api-key">Chave da API Anthropic</label>
           <input type="password" id="api-key" placeholder="sk-ant-...">
-          <p class="dica">Fica salva só no seu navegador (localStorage). Nunca é enviada para nenhum lugar além da API da Anthropic.</p>
+          <p class="dica">Não tem uma chave ainda? Crie em <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a> (Settings → API Keys). É cobrada por uso, separada da assinatura do app Claude.</p>
           <label for="modelo" style="margin-top:0.8rem;">Modelo</label>
-          <input type="text" id="modelo" value="claude-sonnet-4-5-20250929">
+          <select id="modelo">
+            <option value="claude-sonnet-4-5-20250929">Claude Sonnet 4.5 (recomendado)</option>
+            <option value="claude-opus-4-5-20250929">Claude Opus (mais poderoso, mais caro)</option>
+            <option value="claude-haiku-4-5-20251001">Claude Haiku (mais rápido e barato)</option>
+          </select>
           <button id="btn-salvar-config" class="botao-secundario">Salvar</button>
+          <button id="btn-limpar-config" class="botao-secundario">Remover chave salva</button>
           <p id="config-status" class="dica"></p>
         </div>
       </details>
@@ -127,7 +133,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--azul); }
   </main>
 
   <footer>
-    <p>SGC interpreta seu pedido e gera o script mais completo possível, gastando o mínimo de tokens.</p>
+    <p>SGC interpreta seu pedido e gera o script mais completo possível, gastando o mínimo de tokens. Cada pessoa usa sua própria chave de API.</p>
   </footer>
 
 <script>
@@ -209,6 +215,14 @@ Você deve responder SEMPRE e SOMENTE usando a ferramenta "responder", nunca em 
     localStorage.setItem("sgc_api_key", apiKeyInput.value.trim());
     localStorage.setItem("sgc_modelo", modeloInput.value.trim());
     $("config-status").textContent = "Salvo neste navegador.";
+    if (apiKeyInput.value.trim()) $("config-detalhes").open = false;
+    setTimeout(() => ($("config-status").textContent = ""), 2000);
+  });
+
+  $("btn-limpar-config").addEventListener("click", () => {
+    localStorage.removeItem("sgc_api_key");
+    apiKeyInput.value = "";
+    $("config-status").textContent = "Chave removida deste navegador.";
     setTimeout(() => ($("config-status").textContent = ""), 2000);
   });
 
@@ -216,7 +230,7 @@ Você deve responder SEMPRE e SOMENTE usando a ferramenta "responder", nunca em 
 
   async function chamarAnthropic(messages) {
     const apiKey = localStorage.getItem("sgc_api_key");
-    if (!apiKey) throw new Error("Configure sua chave da API acima antes de gerar um script.");
+    if (!apiKey) throw new Error("Configure sua chave da API no painel \"🔑 Sua chave de API\" no topo da página antes de gerar um script.");
     const model = localStorage.getItem("sgc_modelo") || "claude-sonnet-4-5-20250929";
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
