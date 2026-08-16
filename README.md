@@ -8,15 +8,25 @@ Gerador de scripts a partir de pedidos em linguagem natural. Você descreve o qu
 2. A IA interpreta o pedido. Se faltar alguma informação essencial (sistema operacional, linguagem, agendamento, etc.), ela pergunta com opções simples — sem jargão técnico.
 3. Assim que houver informação suficiente, ela gera o script final: código completo, tratamento de erros, e instruções de uso — sem enrolação.
 
-## Uso — Página HTML local (sem servidor)
+## Uso — Página HTML 100% offline, sem chave (`sgc-offline.html`)
 
-A forma mais simples de usar: um único arquivo, sem instalar nada.
+Não precisa de chave de API, conta, nem internet depois do primeiro uso. O modelo de IA roda inteiro dentro do seu navegador via [WebLLM](https://github.com/mlc-ai/web-llm) (WebGPU).
+
+1. Abra `sgc-offline.html` direto no navegador (duplo clique). Precisa de Chrome ou Edge recentes (WebGPU).
+2. Escolha um modelo (o "Equilibrado" é o recomendado) e clique em "Carregar modelo" — na primeira vez ele baixa (1 a 2,5 GB) e fica em cache no navegador; nas próximas vezes carrega direto do cache.
+3. Escreva seu pedido e use normalmente.
+
+**Importante:** modelos pequenos rodando localmente são bem menos capazes que um modelo em nuvem como o Claude. Scripts para pedidos simples saem bem; pedidos complexos ou ambíguos podem exigir tentar de novo ou editar o resultado manualmente. Se o modelo não responder no formato esperado, a página mostra o texto bruto para você copiar.
+
+## Uso — Página HTML local com API em nuvem (`sgc-local.html`)
+
+Mesma ideia de arquivo único, mas usando a API da Anthropic (mais capaz, requer chave paga).
 
 1. Abra `sgc-local.html` direto no navegador (duplo clique, ou "Abrir arquivo").
 2. Clique em "Configuração da API", cole sua chave da Anthropic e clique em "Salvar" — a chave fica salva só no seu navegador (`localStorage`), nunca sai daí exceto para a API da Anthropic.
 3. Escreva seu pedido e use normalmente.
 
-Não precisa de Node, `npm install` nem servidor rodando. O JavaScript da página chama a API da Anthropic diretamente do navegador.
+Não precisa de Node, `npm install` nem servidor rodando.
 
 ## Requisitos (versão com servidor Node)
 
@@ -50,7 +60,8 @@ Responda as perguntas diretamente no terminal.
 ## Estrutura do projeto
 
 ```
-sgc-local.html      # página única, autocontida, roda sem servidor (recomendada para uso local)
+sgc-offline.html    # página única, sem chave, modelo de IA rodando no navegador (WebLLM)
+sgc-local.html      # página única, usa a API da Anthropic direto do navegador (precisa de chave)
 src/
   systemPrompt.js  # persona e regras que a IA segue (linguista + engenheiro, econômico em tokens)
   tool.js           # schema estruturado da resposta da IA (perguntas ou script final)
