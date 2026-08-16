@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SGC — Gerador de Scripts</title>
+<style>
+:root {
+  --azul: #2563eb;
+  --azul-escuro: #1d4ed8;
+  --fundo: #f5f7fb;
+  --texto: #1f2937;
+  --borda: #e2e8f0;
+  --cinza: #64748b;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--fundo);
+  color: var(--texto);
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+header { text-align: center; padding: 2rem 1rem 1rem; }
+header h1 { margin: 0 0 0.4rem; font-size: 1.8rem; }
+.subtitle { color: var(--cinza); margin: 0; }
+main { flex: 1; width: 100%; max-width: 720px; margin: 0 auto; padding: 1rem 1rem 3rem; }
+.cartao {
+  background: white; border: 1px solid var(--borda); border-radius: 12px;
+  padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 1.2rem;
+}
+label { font-weight: 600; display: block; margin-bottom: 0.5rem; }
+textarea, input[type=password], input[type=text] {
+  width: 100%; padding: 0.8rem; border: 1px solid var(--borda);
+  border-radius: 8px; font-size: 1rem; font-family: inherit; resize: vertical;
+}
+textarea:focus, input:focus { outline: 2px solid var(--azul); border-color: transparent; }
+.botao-primario, .botao-secundario {
+  border: none; border-radius: 8px; padding: 0.7rem 1.2rem;
+  font-size: 1rem; cursor: pointer; margin-top: 1rem;
+}
+.botao-primario { background: var(--azul); color: white; }
+.botao-primario:hover { background: var(--azul-escuro); }
+.botao-primario:disabled { background: var(--cinza); cursor: not-allowed; }
+.botao-secundario { background: white; border: 1px solid var(--borda); color: var(--texto); margin-right: 0.5rem; }
+.botao-secundario:hover { background: var(--fundo); }
+.pergunta-bloco { margin-bottom: 1.2rem; }
+.pergunta-bloco p { font-weight: 600; margin-bottom: 0.6rem; }
+.opcoes { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.opcao-botao {
+  border: 1px solid var(--borda); background: white; padding: 0.55rem 1rem;
+  border-radius: 20px; cursor: pointer; font-size: 0.95rem;
+}
+.opcao-botao:hover { border-color: var(--azul); }
+.opcao-botao.selecionada { background: var(--azul); color: white; border-color: var(--azul); }
+pre {
+  background: #0f172a; color: #e2e8f0; padding: 1rem; border-radius: 8px;
+  overflow-x: auto; font-size: 0.9rem; white-space: pre-wrap; word-break: break-word;
+}
+.spinner {
+  width: 32px; height: 32px; border: 3px solid var(--borda); border-top-color: var(--azul);
+  border-radius: 50%; margin: 0 auto 1rem; animation: girar 0.8s linear infinite;
+}
+@keyframes girar { to { transform: rotate(360deg); } }
+.erro { color: #dc2626; margin-top: 0.8rem; }
+.escondido { display: none; }
+.dica { color: var(--cinza); font-size: 0.85rem; margin-top: 0.4rem; }
+footer { text-align: center; color: var(--cinza); font-size: 0.85rem; padding: 1rem; }
+details summary { cursor: pointer; font-weight: 600; color: var(--azul); }
+</style>
+</head>
+<body>
+  <header>
+    <h1>🧩 SGC — Script Generator Console</h1>
+    <p class="subtitle">Descreva o que você precisa. A gente interpreta e gera o script completo.</p>
+  </header>
+
+  <main>
+    <section class="cartao">
+      <details id="config-detalhes">
+        <summary>🔑 Sua chave de API (clique para configurar)</summary>
+        <div style="margin-top:1rem;">
+          <p class="dica">Cada pessoa usa a própria chave — ela fica salva só neste navegador (nunca é enviada para nenhum lugar além da API da Anthropic, e nunca passa por nenhum servidor intermediário).</p>
+          <label for="api-key">Chave da API Anthropic</label>
+          <input type="password" id="api-key" placeholder="sk-ant-...">
+          <p class="dica">Não tem uma chave ainda? Crie em <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a> (Settings → API Keys). É cobrada por uso, separada da assinatura do app Claude.</p>
+          <label for="modelo" style="margin-top:0.8rem;">Modelo</label>
+          <select id="modelo">
+            <option value="claude-sonnet-4-5-20250929">Claude Sonnet 4.5 (recomendado)</option>
+            <option value="claude-opus-4-5-20250929">Claude Opus (mais poderoso, mais caro)</option>
+            <option value="claude-haiku-4-5-20251001">Claude Haiku (mais rápido e barato)</option>
+          </select>
+          <button id="btn-salvar-config" class="botao-secundario">Salvar</button>
+          <button id="btn-limpar-config" class="botao-secundario">Remover chave salva</button>
+          <p id="config-status" class="dica"></p>
+        </div>
+      </details>
+    </section>
+
+    <section id="tela-inicial" class="cartao">
+      <label for="pedido">O que você precisa que o script faça?</label>
+      <textarea id="pedido" rows="5" placeholder="Ex: preciso de algo que apague arquivos temporários toda semana"></textarea>
+      <button id="btn-gerar" class="botao-primario">Gerar script</button>
+      <p id="erro-inicial" class="erro escondido"></p>
+    </section>
+
+    <section id="tela-perguntas" class="cartao escondido">
+      <h2>Só mais alguns detalhes:</h2>
+      <div id="lista-perguntas"></div>
+      <button id="btn-enviar-respostas" class="botao-primario">Continuar</button>
+      <p id="erro-perguntas" class="erro escondido"></p>
+    </section>
+
+    <section id="tela-carregando" class="cartao escondido">
+      <div class="spinner"></div>
+      <p>Interpretando seu pedido…</p>
+    </section>
+
+    <section id="tela-resultado" class="cartao escondido">
+      <h2 id="script-titulo"></h2>
+      <p><strong>Linguagem:</strong> <span id="script-linguagem"></span> &nbsp;|&nbsp; <strong>Arquivo:</strong> <span id="script-arquivo"></span></p>
+      <pre><code id="script-conteudo"></code></pre>
+      <div>
+        <button id="btn-copiar" class="botao-secundario">Copiar script</button>
+        <button id="btn-baixar" class="botao-secundario">Baixar arquivo</button>
+      </div>
+      <h3>Como usar</h3>
+      <p id="script-como-usar"></p>
+      <button id="btn-novo" class="botao-secundario">Gerar outro script</button>
+    </section>
+  </main>
+
+  <footer>
+    <p>SGC interpreta seu pedido e gera o script mais completo possível, gastando o mínimo de tokens. Cada pessoa usa sua própria chave de API.</p>
+  </footer>
+
+<script>
+(() => {
+  const SYSTEM_PROMPT = `Você é o "SGC" (Script Generator Console): um linguista computacional e engenheiro de automação sênior. Sua função é ler pedidos de scripts escritos por usuários de forma informal, incompleta ou ambígua, interpretar a real intenção por trás das palavras (como um linguista faria) e produzir o script mais completo, correto e robusto possível.
+
+REGRAS DE INTERPRETAÇÃO
+1. Extraia a intenção real do pedido mesmo que mal escrito, resumido ou com termos leigos. Traduza termos coloquiais para conceitos técnicos precisos.
+2. Só peça informação que seja REALMENTE necessária para gerar um script correto (ex: sistema operacional/shell alvo, linguagem, caminhos, formato de entrada/saída, frequência/agendamento, credenciais necessárias). Nunca pergunte o que já pode ser inferido com segurança do pedido.
+3. Assuma que quem pergunta pode não ser técnico. Ao perguntar, use linguagem simples, direta, sem jargão. Ofereça de 2 a 5 opções de múltipla escolha por pergunta, cada uma com um rótulo curto e claro; inclua uma opção final tipo "Não sei / use o que for melhor" para deixar a decisão a seu critério quando o usuário não souber responder. Faça no máximo 4 perguntas por rodada.
+4. Quando houver informação suficiente (pedido já era claro OU usuário já respondeu), gere a versão final do script.
+
+REGRAS DO SCRIPT GERADO
+5. O script deve ser o mais completo e robusto possível dentro do escopo pedido: tratar erros plausíveis, validar entradas, cobrir casos de borda razoáveis, ser seguro (nunca destrutivo por padrão, confirmar antes de ações irreversíveis quando fizer sentido).
+6. ECONOMIA DE TOKENS é prioridade absoluta, tanto para pedidos simples quanto complexos: código enxuto, sem redundância, sem boilerplate desnecessário, sem comentários óbvios ou explicações longas. Comente só o que não é óbvio (uma decisão não trivial, uma pegadinha, um valor mágico). Não gere explicação alguma fora dos campos estruturados pedidos.
+7. Escolha a linguagem/shell mais adequada ao pedido e ao ambiente informado (bash, PowerShell, Python, Node.js etc.); se ambíguo, pergunte.
+8. Nunca gere scripts maliciosos, destrutivos sem salvaguarda, ou que exfiltrem dados sem propósito legítimo explícito do usuário.
+9. Responda sempre no mesmo idioma usado pelo usuário no pedido original.
+
+FORMATO DE RESPOSTA
+Você deve responder SEMPRE e SOMENTE usando a ferramenta "responder", nunca em texto livre fora dela.`;
+
+  const RESPOND_TOOL = {
+    name: "responder",
+    description: "Envia a decisão do SGC: ou perguntas de esclarecimento (múltipla escolha) ou o script final completo.",
+    input_schema: {
+      type: "object",
+      properties: {
+        status: { type: "string", enum: ["precisa_info", "pronto"] },
+        perguntas: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              pergunta: { type: "string" },
+              opcoes: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: { rotulo: { type: "string" }, valor: { type: "string" } },
+                  required: ["rotulo", "valor"]
+                }
+              }
+            },
+            required: ["id", "pergunta", "opcoes"]
+          }
+        },
+        script: {
+          type: "object",
+          properties: {
+            titulo: { type: "string" },
+            linguagem: { type: "string" },
+            nome_arquivo: { type: "string" },
+            conteudo: { type: "string" },
+            como_usar: { type: "string" }
+          },
+          required: ["titulo", "linguagem", "nome_arquivo", "conteudo", "como_usar"]
+        }
+      },
+      required: ["status"]
+    }
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const telas = ["tela-inicial", "tela-perguntas", "tela-carregando", "tela-resultado"].map($);
+  function mostrar(tela) {
+    telas.forEach((t) => t.classList.add("escondido"));
+    tela.classList.remove("escondido");
+  }
+
+  const apiKeyInput = $("api-key");
+  const modeloInput = $("modelo");
+  apiKeyInput.value = localStorage.getItem("sgc_api_key") || "";
+  modeloInput.value = localStorage.getItem("sgc_modelo") || "claude-sonnet-4-5-20250929";
+  if (!apiKeyInput.value) $("config-detalhes").open = true;
+
+  $("btn-salvar-config").addEventListener("click", () => {
+    localStorage.setItem("sgc_api_key", apiKeyInput.value.trim());
+    localStorage.setItem("sgc_modelo", modeloInput.value.trim());
+    $("config-status").textContent = "Salvo neste navegador.";
+    if (apiKeyInput.value.trim()) $("config-detalhes").open = false;
+    setTimeout(() => ($("config-status").textContent = ""), 2000);
+  });
+
+  $("btn-limpar-config").addEventListener("click", () => {
+    localStorage.removeItem("sgc_api_key");
+    apiKeyInput.value = "";
+    $("config-status").textContent = "Chave removida deste navegador.";
+    setTimeout(() => ($("config-status").textContent = ""), 2000);
+  });
+
+  let estado = { messages: [], toolUseId: null, perguntas: [], respostas: {}, scriptAtual: null };
+
+  async function chamarAnthropic(messages) {
+    const apiKey = localStorage.getItem("sgc_api_key");
+    if (!apiKey) throw new Error("Configure sua chave da API no painel \"🔑 Sua chave de API\" no topo da página antes de gerar um script.");
+    const model = localStorage.getItem("sgc_modelo") || "claude-sonnet-4-5-20250929";
+
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true"
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 4096,
+        system: SYSTEM_PROMPT,
+        tools: [RESPOND_TOOL],
+        tool_choice: { type: "tool", name: "responder" },
+        messages
+      })
+    });
+
+    if (!res.ok) {
+      const texto = await res.text().catch(() => "");
+      throw new Error(`Erro na API (${res.status}): ${texto.slice(0, 300)}`);
+    }
+    const dados = await res.json();
+    const toolUse = (dados.content || []).find((b) => b.type === "tool_use");
+    if (!toolUse) throw new Error("A resposta da IA não veio no formato esperado.");
+    return { assistantMessage: { role: "assistant", content: dados.content }, toolUse };
+  }
+
+  function renderizarPerguntas() {
+    const container = $("lista-perguntas");
+    container.innerHTML = "";
+    estado.perguntas.forEach((p) => {
+      const bloco = document.createElement("div");
+      bloco.className = "pergunta-bloco";
+      const texto = document.createElement("p");
+      texto.textContent = p.pergunta;
+      bloco.appendChild(texto);
+      const opcoesDiv = document.createElement("div");
+      opcoesDiv.className = "opcoes";
+      p.opcoes.forEach((o) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "opcao-botao";
+        btn.textContent = o.rotulo;
+        btn.addEventListener("click", () => {
+          opcoesDiv.querySelectorAll(".opcao-botao").forEach((b) => b.classList.remove("selecionada"));
+          btn.classList.add("selecionada");
+          estado.respostas[p.id] = o.valor;
+        });
+        opcoesDiv.appendChild(btn);
+      });
+      bloco.appendChild(opcoesDiv);
+      container.appendChild(bloco);
+    });
+  }
+
+  function renderizarScript(script) {
+    $("script-titulo").textContent = script.titulo;
+    $("script-linguagem").textContent = script.linguagem;
+    $("script-arquivo").textContent = script.nome_arquivo;
+    $("script-conteudo").textContent = script.conteudo;
+    $("script-como-usar").textContent = script.como_usar;
+    estado.scriptAtual = script;
+  }
+
+  function tratarResultado(assistantMessage, toolUse, messagesAnteriores) {
+    estado.messages = [...messagesAnteriores, assistantMessage];
+    const r = toolUse.input;
+    if (r.status === "precisa_info") {
+      estado.toolUseId = toolUse.id;
+      estado.perguntas = r.perguntas || [];
+      estado.respostas = {};
+      renderizarPerguntas();
+      mostrar($("tela-perguntas"));
+      return;
+    }
+    if (r.status === "pronto" && r.script) {
+      renderizarScript(r.script);
+      mostrar($("tela-resultado"));
+      return;
+    }
+    throw new Error("Resposta inesperada da IA.");
+  }
+
+  $("btn-gerar").addEventListener("click", async () => {
+    const pedido = $("pedido").value.trim();
+    $("erro-inicial").classList.add("escondido");
+    if (!pedido) {
+      $("erro-inicial").textContent = "Escreva o que você precisa antes de continuar.";
+      $("erro-inicial").classList.remove("escondido");
+      return;
+    }
+    const messages = [{ role: "user", content: pedido }];
+    mostrar($("tela-carregando"));
+    try {
+      const { assistantMessage, toolUse } = await chamarAnthropic(messages);
+      tratarResultado(assistantMessage, toolUse, messages);
+    } catch (err) {
+      mostrar($("tela-inicial"));
+      $("erro-inicial").textContent = err.message;
+      $("erro-inicial").classList.remove("escondido");
+    }
+  });
+
+  $("btn-enviar-respostas").addEventListener("click", async () => {
+    $("erro-perguntas").classList.add("escondido");
+    const faltando = estado.perguntas.some((p) => !(p.id in estado.respostas));
+    if (faltando) {
+      $("erro-perguntas").textContent = "Escolha uma opção para cada pergunta.";
+      $("erro-perguntas").classList.remove("escondido");
+      return;
+    }
+    const novasMensagens = [
+      ...estado.messages,
+      { role: "user", content: [{ type: "tool_result", tool_use_id: estado.toolUseId, content: JSON.stringify(estado.respostas) }] }
+    ];
+    mostrar($("tela-carregando"));
+    try {
+      const { assistantMessage, toolUse } = await chamarAnthropic(novasMensagens);
+      tratarResultado(assistantMessage, toolUse, novasMensagens);
+    } catch (err) {
+      mostrar($("tela-perguntas"));
+      $("erro-perguntas").textContent = err.message;
+      $("erro-perguntas").classList.remove("escondido");
+    }
+  });
+
+  $("btn-copiar").addEventListener("click", async () => {
+    await navigator.clipboard.writeText(estado.scriptAtual.conteudo);
+    const btn = $("btn-copiar");
+    const original = btn.textContent;
+    btn.textContent = "Copiado!";
+    setTimeout(() => (btn.textContent = original), 1500);
+  });
+
+  $("btn-baixar").addEventListener("click", () => {
+    const script = estado.scriptAtual;
+    const blob = new Blob([script.conteudo], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = script.nome_arquivo || "script.txt";
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  $("btn-novo").addEventListener("click", () => {
+    $("pedido").value = "";
+    estado = { messages: [], toolUseId: null, perguntas: [], respostas: {}, scriptAtual: null };
+    mostrar($("tela-inicial"));
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SGC - Gerador de Scripts (offline, sem chave)</title>
+<style>
+:root {
+  --azul: #2563eb; --azul-escuro: #1d4ed8; --fundo: #f5f7fb;
+  --texto: #1f2937; --borda: #e2e8f0; --cinza: #64748b;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--fundo); color: var(--texto);
+  display: flex; flex-direction: column; min-height: 100vh;
+}
+header { text-align: center; padding: 2rem 1rem 1rem; }
+header h1 { margin: 0 0 0.4rem; font-size: 1.8rem; }
+.subtitle { color: var(--cinza); margin: 0; }
+main { flex: 1; width: 100%; max-width: 720px; margin: 0 auto; padding: 1rem 1rem 3rem; }
+.cartao {
+  background: white; border: 1px solid var(--borda); border-radius: 12px;
+  padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 1.2rem;
+}
+label { font-weight: 600; display: block; margin-bottom: 0.5rem; }
+select, textarea {
+  width: 100%; padding: 0.8rem; border: 1px solid var(--borda);
+  border-radius: 8px; font-size: 1rem; font-family: inherit; resize: vertical;
+}
+textarea:focus, select:focus { outline: 2px solid var(--azul); border-color: transparent; }
+.botao-primario, .botao-secundario {
+  border: none; border-radius: 8px; padding: 0.7rem 1.2rem;
+  font-size: 1rem; cursor: pointer; margin-top: 1rem;
+}
+.botao-primario { background: var(--azul); color: white; }
+.botao-primario:hover { background: var(--azul-escuro); }
+.botao-primario:disabled { background: var(--cinza); cursor: not-allowed; }
+.botao-secundario { background: white; border: 1px solid var(--borda); color: var(--texto); margin-right: 0.5rem; }
+.botao-secundario:hover { background: var(--fundo); }
+.pergunta-bloco { margin-bottom: 1.2rem; }
+.pergunta-bloco p { font-weight: 600; margin-bottom: 0.6rem; }
+.opcoes { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.opcao-botao {
+  border: 1px solid var(--borda); background: white; padding: 0.55rem 1rem;
+  border-radius: 20px; cursor: pointer; font-size: 0.95rem;
+}
+.opcao-botao:hover { border-color: var(--azul); }
+.opcao-botao.selecionada { background: var(--azul); color: white; border-color: var(--azul); }
+pre {
+  background: #0f172a; color: #e2e8f0; padding: 1rem; border-radius: 8px;
+  overflow-x: auto; font-size: 0.9rem; white-space: pre-wrap; word-break: break-word;
+}
+.barra-progresso {
+  width: 100%; height: 10px; background: var(--borda); border-radius: 6px; overflow: hidden; margin: 0.8rem 0;
+}
+.barra-progresso-interna { height: 100%; background: var(--azul); width: 0%; transition: width 0.2s; }
+.erro { color: #dc2626; margin-top: 0.8rem; }
+.aviso { color: #b45309; background: #fffbeb; border: 1px solid #fde68a; padding: 0.8rem; border-radius: 8px; margin-top: 0.8rem; font-size: 0.9rem; }
+.escondido { display: none; }
+.dica { color: var(--cinza); font-size: 0.85rem; margin-top: 0.4rem; }
+footer { text-align: center; color: var(--cinza); font-size: 0.85rem; padding: 1rem; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>🧩 SGC — Script Generator Console</h1>
+    <p class="subtitle">Versão 100% offline: o modelo roda no seu navegador, sem chave e sem servidor.</p>
+  </header>
+
+  <main>
+    <section id="tela-modelo" class="cartao">
+      <label for="select-modelo">Escolha o modelo (baixado uma vez e guardado no navegador)</label>
+      <select id="select-modelo">
+        <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC">Rápido e leve (~0.9 GB) — respostas mais simples</option>
+        <option value="Qwen2.5-3B-Instruct-q4f16_1-MLC" selected>Equilibrado (~2.2 GB) — recomendado</option>
+        <option value="Phi-3.5-mini-instruct-q4f16_1-MLC">Mais completo (~2.5 GB) — mais lento para carregar</option>
+      </select>
+      <p class="dica">O download acontece só na primeira vez (fica em cache no navegador). Precisa de um navegador com WebGPU (Chrome ou Edge recentes).</p>
+      <button id="btn-carregar-modelo" class="botao-primario">Carregar modelo</button>
+      <div id="progresso-container" class="escondido">
+        <div class="barra-progresso"><div id="barra-interna" class="barra-progresso-interna"></div></div>
+        <p id="progresso-texto" class="dica"></p>
+      </div>
+      <p id="erro-modelo" class="erro escondido"></p>
+      <p id="webgpu-aviso" class="aviso escondido">Seu navegador não parece suportar WebGPU. Use uma versão recente do Chrome ou Edge (Firefox e Safari ainda têm suporte limitado).</p>
+    </section>
+
+    <section id="tela-inicial" class="cartao escondido">
+      <label for="pedido">O que você precisa que o script faça?</label>
+      <textarea id="pedido" rows="5" placeholder="Ex: preciso de algo que apague arquivos temporários toda semana"></textarea>
+      <button id="btn-gerar" class="botao-primario">Gerar script</button>
+      <p id="erro-inicial" class="erro escondido"></p>
+    </section>
+
+    <section id="tela-perguntas" class="cartao escondido">
+      <h2>Só mais alguns detalhes:</h2>
+      <div id="lista-perguntas"></div>
+      <button id="btn-enviar-respostas" class="botao-primario">Continuar</button>
+      <p id="erro-perguntas" class="erro escondido"></p>
+    </section>
+
+    <section id="tela-carregando" class="cartao escondido">
+      <p id="carregando-texto">Interpretando seu pedido…</p>
+    </section>
+
+    <section id="tela-resultado" class="cartao escondido">
+      <h2 id="script-titulo"></h2>
+      <p><strong>Linguagem:</strong> <span id="script-linguagem"></span> &nbsp;|&nbsp; <strong>Arquivo:</strong> <span id="script-arquivo"></span></p>
+      <pre><code id="script-conteudo"></code></pre>
+      <div>
+        <button id="btn-copiar" class="botao-secundario">Copiar script</button>
+        <button id="btn-baixar" class="botao-secundario">Baixar arquivo</button>
+      </div>
+      <h3>Como usar</h3>
+      <p id="script-como-usar"></p>
+      <button id="btn-novo" class="botao-secundario">Gerar outro script</button>
+    </section>
+
+    <section id="tela-resposta-crua" class="cartao escondido">
+      <p class="aviso">Não consegui organizar a resposta do modelo no formato esperado. Aqui está o texto original — você pode copiar o que precisar dele.</p>
+      <pre><code id="resposta-crua-texto"></code></pre>
+      <button id="btn-novo-crua" class="botao-secundario">Tentar de novo</button>
+    </section>
+  </main>
+
+  <footer>
+    <p>Modelo local via <a href="https://github.com/mlc-ai/web-llm" target="_blank" rel="noopener">WebLLM</a>. Qualidade menor que um modelo em nuvem, mas roda 100% no seu computador.</p>
+  </footer>
+
+<script type="module">
+import * as webllm from "https://esm.run/@mlc-ai/web-llm";
+
+const SYSTEM_PROMPT = `Você é o SGC, um assistente que transforma pedidos informais em scripts completos. Responda SEMPRE em português e SEMPRE em um dos dois formatos abaixo, exatamente, sem nenhum texto fora deles.
+
+FORMATO 1 - quando faltar informação essencial (sistema operacional, linguagem, caminhos, agendamento etc; no máximo 3 perguntas, no máximo 4 opções cada):
+STATUS: PERGUNTAS
+1. texto da pergunta | opção A | opção B | opção C
+2. texto da pergunta | opção A | opção B
+
+FORMATO 2 - quando já houver informação suficiente:
+STATUS: PRONTO
+TITULO: título curto
+LINGUAGEM: ex bash, python, powershell
+ARQUIVO: nome_sugerido.ext
+---SCRIPT---
+(código completo aqui, sem comentários óbvios, enxuto, tratando erros plausíveis)
+---FIM---
+COMO_USAR: instruções curtas de uso
+
+Regras: só pergunte o que for realmente necessário; nunca invente dados; gere código enxuto e funcional; nunca gere nada destrutivo sem aviso.`;
+
+const $ = (id) => document.getElementById(id);
+const telas = ["tela-modelo","tela-inicial","tela-perguntas","tela-carregando","tela-resultado","tela-resposta-crua"].map($);
+function mostrar(tela) { telas.forEach(t => t.classList.add("escondido")); tela.classList.remove("escondido"); }
+
+let engine = null;
+let estado = { messages: [], perguntas: [], respostas: {}, scriptAtual: null, ultimaRespostaCrua: "" };
+
+if (!("gpu" in navigator)) {
+  $("webgpu-aviso").classList.remove("escondido");
+  $("btn-carregar-modelo").disabled = true;
+}
+
+$("btn-carregar-modelo").addEventListener("click", async () => {
+  const modeloId = $("select-modelo").value;
+  $("erro-modelo").classList.add("escondido");
+  $("btn-carregar-modelo").disabled = true;
+  $("progresso-container").classList.remove("escondido");
+  try {
+    engine = await webllm.CreateMLCEngine(modeloId, {
+      initProgressCallback: (info) => {
+        const pct = Math.round((info.progress || 0) * 100);
+        $("barra-interna").style.width = pct + "%";
+        $("progresso-texto").textContent = info.text || (pct + "%");
+      }
+    });
+    mostrar($("tela-inicial"));
+  } catch (err) {
+    $("erro-modelo").textContent = "Erro ao carregar o modelo: " + err.message;
+    $("erro-modelo").classList.remove("escondido");
+    $("btn-carregar-modelo").disabled = false;
+  }
+});
+
+function parseResposta(texto) {
+  const linhas = texto.trim().split("\n");
+  const statusLinha = linhas.find(l => l.trim().toUpperCase().startsWith("STATUS:"));
+  const status = statusLinha ? statusLinha.split(":")[1].trim().toUpperCase() : "";
+
+  if (status.includes("PERGUNTA")) {
+    const perguntas = [];
+    for (const linha of linhas) {
+      const m = linha.match(/^\s*\d+\.\s*(.+)$/);
+      if (!m) continue;
+      const partes = m[1].split("|").map(s => s.trim()).filter(Boolean);
+      if (partes.length < 2) continue;
+      const pergunta = partes[0];
+      const opcoes = partes.slice(1).map(rotulo => ({ rotulo, valor: rotulo }));
+      perguntas.push({ id: "p" + perguntas.length, pergunta, opcoes });
+    }
+    if (perguntas.length === 0) return null;
+    return { status: "precisa_info", perguntas };
+  }
+
+  if (status.includes("PRONTO")) {
+    const pegar = (chave) => {
+      const l = linhas.find(l => l.trim().toUpperCase().startsWith(chave.toUpperCase() + ":"));
+      return l ? l.split(":").slice(1).join(":").trim() : "";
+    };
+    const inicioScript = texto.indexOf("---SCRIPT---");
+    const fimScript = texto.indexOf("---FIM---");
+    if (inicioScript === -1 || fimScript === -1 || fimScript <= inicioScript) return null;
+    const conteudo = texto.slice(inicioScript + "---SCRIPT---".length, fimScript).trim();
+    const comoUsarLinha = linhas.find(l => l.trim().toUpperCase().startsWith("COMO_USAR:"));
+    const script = {
+      titulo: pegar("TITULO") || "Script gerado",
+      linguagem: pegar("LINGUAGEM") || "texto",
+      nome_arquivo: pegar("ARQUIVO") || "script.txt",
+      conteudo,
+      como_usar: comoUsarLinha ? comoUsarLinha.split(":").slice(1).join(":").trim() : ""
+    };
+    if (!script.conteudo) return null;
+    return { status: "pronto", script };
+  }
+
+  return null;
+}
+
+function renderizarPerguntas() {
+  const container = $("lista-perguntas");
+  container.innerHTML = "";
+  estado.perguntas.forEach((p) => {
+    const bloco = document.createElement("div");
+    bloco.className = "pergunta-bloco";
+    const texto = document.createElement("p");
+    texto.textContent = p.pergunta;
+    bloco.appendChild(texto);
+    const opcoesDiv = document.createElement("div");
+    opcoesDiv.className = "opcoes";
+    p.opcoes.forEach((o) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "opcao-botao";
+      btn.textContent = o.rotulo;
+      btn.addEventListener("click", () => {
+        opcoesDiv.querySelectorAll(".opcao-botao").forEach(b => b.classList.remove("selecionada"));
+        btn.classList.add("selecionada");
+        estado.respostas[p.id] = o.valor;
+      });
+      opcoesDiv.appendChild(btn);
+    });
+    bloco.appendChild(opcoesDiv);
+    container.appendChild(bloco);
+  });
+}
+
+function renderizarScript(script) {
+  $("script-titulo").textContent = script.titulo;
+  $("script-linguagem").textContent = script.linguagem;
+  $("script-arquivo").textContent = script.nome_arquivo;
+  $("script-conteudo").textContent = script.conteudo;
+  $("script-como-usar").textContent = script.como_usar;
+  estado.scriptAtual = script;
+}
+
+async function gerar(mensagensParaEnviar) {
+  mostrar($("tela-carregando"));
+  const resposta = await engine.chat.completions.create({
+    messages: mensagensParaEnviar,
+    temperature: 0.3,
+    max_tokens: 1200
+  });
+  const texto = resposta.choices[0].message.content;
+  estado.messages = [...mensagensParaEnviar, { role: "assistant", content: texto }];
+  estado.ultimaRespostaCrua = texto;
+
+  const parsed = parseResposta(texto);
+  if (!parsed) {
+    $("resposta-crua-texto").textContent = texto;
+    mostrar($("tela-resposta-crua"));
+    return;
+  }
+  if (parsed.status === "precisa_info") {
+    estado.perguntas = parsed.perguntas;
+    estado.respostas = {};
+    renderizarPerguntas();
+    mostrar($("tela-perguntas"));
+    return;
+  }
+  renderizarScript(parsed.script);
+  mostrar($("tela-resultado"));
+}
+
+$("btn-gerar").addEventListener("click", async () => {
+  const pedido = $("pedido").value.trim();
+  $("erro-inicial").classList.add("escondido");
+  if (!pedido) {
+    $("erro-inicial").textContent = "Escreva o que você precisa antes de continuar.";
+    $("erro-inicial").classList.remove("escondido");
+    return;
+  }
+  const mensagens = [{ role: "system", content: SYSTEM_PROMPT }, { role: "user", content: pedido }];
+  try {
+    await gerar(mensagens);
+  } catch (err) {
+    mostrar($("tela-inicial"));
+    $("erro-inicial").textContent = "Erro: " + err.message;
+    $("erro-inicial").classList.remove("escondido");
+  }
+});
+
+$("btn-enviar-respostas").addEventListener("click", async () => {
+  $("erro-perguntas").classList.add("escondido");
+  const faltando = estado.perguntas.some(p => !(p.id in estado.respostas));
+  if (faltando) {
+    $("erro-perguntas").textContent = "Escolha uma opção para cada pergunta.";
+    $("erro-perguntas").classList.remove("escondido");
+    return;
+  }
+  const resumoRespostas = estado.perguntas.map(p => `${p.pergunta} => ${estado.respostas[p.id]}`).join("; ");
+  const mensagens = [...estado.messages, { role: "user", content: "Minhas respostas: " + resumoRespostas }];
+  try {
+    await gerar(mensagens);
+  } catch (err) {
+    mostrar($("tela-perguntas"));
+    $("erro-perguntas").textContent = "Erro: " + err.message;
+    $("erro-perguntas").classList.remove("escondido");
+  }
+});
+
+$("btn-copiar").addEventListener("click", async () => {
+  await navigator.clipboard.writeText(estado.scriptAtual.conteudo);
+  const btn = $("btn-copiar");
+  const original = btn.textContent;
+  btn.textContent = "Copiado!";
+  setTimeout(() => (btn.textContent = original), 1500);
+});
+
+$("btn-baixar").addEventListener("click", () => {
+  const script = estado.scriptAtual;
+  const blob = new Blob([script.conteudo], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = script.nome_arquivo || "script.txt";
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+function reiniciar() {
+  $("pedido").value = "";
+  estado = { messages: [], perguntas: [], respostas: {}, scriptAtual: null, ultimaRespostaCrua: "" };
+  mostrar($("tela-inicial"));
+}
+$("btn-novo").addEventListener("click", reiniciar);
+$("btn-novo-crua").addEventListener("click", reiniciar);
+</script>
+</body>
+</html>
