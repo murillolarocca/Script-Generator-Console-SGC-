@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SGC - Gerador de Scripts</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>🧩 SGC — Script Generator Console</h1>
+    <p class="subtitle">Descreva o que você precisa, do seu jeito. A gente cuida do resto.</p>
+  </header>
+
+  <main>
+    <section id="tela-inicial" class="cartao">
+      <label for="pedido">O que você precisa que o script faça?</label>
+      <textarea id="pedido" rows="5" placeholder="Ex: preciso de algo que apague arquivos temporários toda semana"></textarea>
+      <button id="btn-gerar" class="botao-primario">Gerar script</button>
+      <p id="erro-inicial" class="erro escondido"></p>
+    </section>
+
+    <section id="tela-perguntas" class="cartao escondido">
+      <h2>Só mais alguns detalhes:</h2>
+      <div id="lista-perguntas"></div>
+      <button id="btn-enviar-respostas" class="botao-primario">Continuar</button>
+      <p id="erro-perguntas" class="erro escondido"></p>
+    </section>
+
+    <section id="tela-carregando" class="cartao escondido">
+      <div class="spinner"></div>
+      <p>Interpretando seu pedido…</p>
+    </section>
+
+    <section id="tela-resultado" class="cartao escondido">
+      <h2 id="script-titulo"></h2>
+      <p><strong>Linguagem:</strong> <span id="script-linguagem"></span> &nbsp;|&nbsp; <strong>Arquivo:</strong> <span id="script-arquivo"></span></p>
+      <pre><code id="script-conteudo"></code></pre>
+      <div class="botoes-resultado">
+        <button id="btn-copiar" class="botao-secundario">Copiar script</button>
+        <button id="btn-baixar" class="botao-secundario">Baixar arquivo</button>
+      </div>
+      <h3>Como usar</h3>
+      <p id="script-como-usar"></p>
+      <button id="btn-novo" class="botao-secundario">Gerar outro script</button>
+    </section>
+  </main>
+
+  <footer>
+    <p>SGC interpreta seu pedido e gera o script mais completo possível, gastando o mínimo de recursos.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
