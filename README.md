@@ -8,7 +8,17 @@ Gerador de scripts a partir de pedidos em linguagem natural. Você descreve o qu
 2. A IA interpreta o pedido. Se faltar alguma informação essencial (sistema operacional, linguagem, agendamento, etc.), ela pergunta com opções simples — sem jargão técnico.
 3. Assim que houver informação suficiente, ela gera o script final: código completo, tratamento de erros, e instruções de uso — sem enrolação.
 
-## Requisitos
+## Uso — Página HTML local (sem servidor)
+
+A forma mais simples de usar: um único arquivo, sem instalar nada.
+
+1. Abra `sgc-local.html` direto no navegador (duplo clique, ou "Abrir arquivo").
+2. Clique em "Configuração da API", cole sua chave da Anthropic e clique em "Salvar" — a chave fica salva só no seu navegador (`localStorage`), nunca sai daí exceto para a API da Anthropic.
+3. Escreva seu pedido e use normalmente.
+
+Não precisa de Node, `npm install` nem servidor rodando. O JavaScript da página chama a API da Anthropic diretamente do navegador.
+
+## Requisitos (versão com servidor Node)
 
 - Node.js 18 ou superior
 - Uma chave de API da Anthropic (`ANTHROPIC_API_KEY`)
@@ -40,6 +50,7 @@ Responda as perguntas diretamente no terminal.
 ## Estrutura do projeto
 
 ```
+sgc-local.html      # página única, autocontida, roda sem servidor (recomendada para uso local)
 src/
   systemPrompt.js  # persona e regras que a IA segue (linguista + engenheiro, econômico em tokens)
   tool.js           # schema estruturado da resposta da IA (perguntas ou script final)
